@@ -1,0 +1,393 @@
+import RPi.GPIO as GPIO
+
+from time import sleep
+import time
+import threading
+from ultrasonic import distance
+
+counter = 10  # base counter used for transfer function
+#Enc_A = 4  # pin decleration for encoder A
+#Enc_B = 18  # pin decleration for encoder B
+
+
+class switchboxIn:
+    def __init__(self, sb1, sb2, sb3, sb4):
+        self.logic_pins = [sb1, sb2, sb3, sb4]
+
+    def init_pins(self):
+        for pin in self.logic_pins:
+            print("Setting up", pin, "for output")
+            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
+    def getSwitchBoxSignal(self, loc):
+        return GPIO.input(self.logic_pins[loc])
+
+
+class switchboxOut:
+    def __init__(self, sb1):
+        self.logic_pins = [sb1]
+
+    def init_pins(self):
+        for pin in self.logic_pins:
+            print("Setting up", pin, "for output")
+            GPIO.setup(pin, GPIO.OUT)
+            GPIO.output(pin, 0)
+
+    def turnOn(self, led):
+        GPIO.output(self.logic_pins[led], 1)
+
+    def turnOff(self, led):
+        GPIO.output(self.logic_pins[led], 0)
+
+
+#class encoder:
+
+#    def __init__(self, e1):
+#        self.logic_pin = e1
+
+#    def init_pin(self):
+        """
+
+        Sets up pins for encoders using an IF due to our transfer function
+        algorithm is concerned with edge detection events on Pin A
+
+        :return:
+        """
+#        if self.logic_pin == Enc_A:
+#            GPIO.setup(self.logic_pin, GPIO.IN)
+        # GPIO.add_event_detect(Enc_A, GPIO.RISING, callback=rotation_decode)
+#        else:
+#            GPIO.setup(self.logic_pin, GPIO.IN)
+
+#    def getSignal(self):
+        """
+
+        Gets signal HIGH or LOW
+
+        :return: 0 or 1 for LOW or HIGH respecitvly
+        """
+#        return GPIO.input(self.logic_pin)
+
+#    def getPin(self):
+        """
+
+        Get Pin number
+
+        :return: pin number
+        """
+#        pin = self.logic_pin
+#        return pin
+
+
+
+class MicrophoneADC:
+    def __init__(self, p1,p2):
+        self.logic_pins = [p1,p2]
+    def init_pins(self):
+        for pin in self.logic_pins:
+            GPIO.setup(pin, GPIO.IN)
+    def getPinSignal(self, pin):
+        return GPIO.input(pin)
+
+
+class motor:
+    """
+    Motor Class for initializing motors and their pins
+    """
+
+    def __init__(self, p1, p2):
+        """
+
+        Motor constructor that takes in pins and sets them
+
+        :param pwm: PWM pin number
+        :param p1: GPIO pin1
+        :param p2: GPIO pin2
+        """
+
+        self.pwm_pins = [p1, p2]
+        self.pwm0 = None
+        self.pwm1 = None
+        self.speed = 0
+
+    def init_pins(self):
+        """
+        Initializes the motor +/- pins for inputs and PWM for inputs
+        :return:
+        """
+        # reports to user pins are being set up
+
+
+        GPIO.setup(self.pwm_pins[0], GPIO.OUT) #800
+        self.pwm0 = GPIO.PWM(self.pwm_pins[0], 90)
+        self.pwm0.start(0)
+
+        GPIO.setup(self.pwm_pins[1], GPIO.OUT)
+        self.pwm1 = GPIO.PWM(self.pwm_pins[1], 90)
+        self.pwm1.start(0)
+
+    def set_speed(self, loc, speed):
+        """
+        Sets speed based on passed through value of speed and sets the pwm Duty cycle to param speed.
+        :param speed:
+        :return:
+        """
+        if loc == 1:
+            self.pwm1.ChangeDutyCycle(abs(speed))
+            self.pwm0.ChangeDutyCycle(abs(0))
+        elif loc == 0:
+            self.pwm0.ChangeDutyCycle(abs(speed))
+            self.pwm1.ChangeDutyCycle(abs(0))
+        elif loc == 'stop':
+            self.pwm0.ChangeDutyCycle(abs(speed))
+            self.pwm1.ChangeDutyCycle(abs(speed))
+
+
+# def my_callback(encoders[0].getPin()):
+#   le+=1
+
+
+def timedDrive(timer, d):
+    timeOut = timer
+    timeOut_start = time.time()
+    while time.time() <= timeOut_start + timeOut:
+        d()
+    stop()
+
+
+def fig8():
+    timedDrive(.25, rightTurn)
+    sleep(.002)
+
+    for i in range(2):
+        timedDrive(4, Forward)
+        timedDrive(1, stop)
+        sleep(.5)
+        timedDrive(2.5, rightMotor)
+        timedDrive(1,stop)
+        sleep(.5)
+        timedDrive(4, Forward)
+        timedDrive(1, stop)
+        sleep(.5)
+        timedDrive(3.45, leftMotor)
+        timedDrive(1,stop)
+        sleep(.5)
+
+    stop()
+
+
+def square():
+    for i in range(2):
+        for i in range(4):
+            print('forward')
+            timedDrive(4, Forward)
+            timedDrive(1, stop)
+            sleep(.5)
+            print('leftturn')
+            timedDrive(0.38, leftTurn)
+            sleep(1)
+        sleep(4)
+
+def Forward():
+    motors[0].set_speed(0, 70)
+    motors[1].set_speed(0, 70)
+
+"""
+    t1 = threading.Thread(target = motors[0].set_speed, args = (0, 100))
+    t2 = threading.Thread(target = motors[1].set_speed, args = (0, 100))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+"""
+
+def stop():
+    motors[0].set_speed('stop', 0)
+    motors[1].set_speed('stop', 0)
+
+
+def reverse():
+    motors[0].set_speed(1, 50)
+    motors[1].set_speed(1, 50)
+
+
+def rightTurn():
+    motors[0].set_speed(0, 50)
+    motors[1].set_speed(1, 50)
+
+
+def leftTurn():
+    motors[0].set_speed(1, 100)
+    motors[1].set_speed(0, 100)
+
+
+def leftMotor():
+    motors[0].set_speed(0, 70)
+    motors[1].set_speed('stop', 0)
+
+
+def rightMotor():
+    motors[0].set_speed('stop', 0)
+    motors[1].set_speed(0, 70)
+
+
+
+
+
+
+
+# Creating list of motors for constructor iterators motor[0] == left motor[1] == right
+
+motors = [motor(23, 24), motor(5, 6)]  # 22 #25
+sIn = switchboxIn(19, 26, 21, 20)
+sOut = switchboxOut(27)
+mic = MicrophoneADC(4, 18)
+#mic = 4
+
+
+
+print("Cleaning up GPIO")
+GPIO.cleanup()
+GPIO.setmode(GPIO.BCM)
+GPIO_TRIGGER = 16
+GPIO_ECHO = 12
+GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
+GPIO.setup(GPIO_ECHO, GPIO.IN)
+
+
+def main():
+    """
+    Main function for running our tests
+    :return:
+    """
+
+    for m in motors:
+        m.init_pins()
+    #for e in encoders:
+    #    e.init_pin()
+
+    mic.init_pins()
+
+
+#    GPIO.setup(mic, GPIO.IN)
+    sIn.init_pins()
+    sOut.init_pins()
+    """
+    while True:
+        sleep(4)
+        if GPIO.input(mic) == 1:
+            print("Mic Signal High")
+        else:
+        print("Mic Signal Low")
+    """
+
+    for i in range(4):
+        print(sIn.getSwitchBoxSignal(i))
+
+    fiveHundred = False
+    twoThousand = False
+    eightThousand = False
+    timeout = 180
+    timeout_start = time.time()
+    distanceAway = 0;
+    while time.time() < timeout_start + timeout:
+        if sIn.getSwitchBoxSignal(0) == 1:
+            sOut.turnOn(0)
+            sleep(2)
+            while sIn.getSwitchBoxSignal(0) == 1:
+                sleep(1)
+                if sIn.getSwitchBoxSignal(1) == 1 and sIn.getSwitchBoxSignal(2) == 0 and sIn.getSwitchBoxSignal(3) == 0:
+                    print("Straight (1100)")
+                    sleep(2)
+                    timedDrive(4, Forward) #5
+                    stop()
+                    while sIn.getSwitchBoxSignal(0) == 1:
+                        sleep(1)
+                else:
+                    sleep(1)
+                if sIn.getSwitchBoxSignal(1) == 1 and sIn.getSwitchBoxSignal(2) == 0 and sIn.getSwitchBoxSignal(3) == 1:
+                    print("Figure 8 (1101)")
+                    sleep(2)
+                    fig8()
+                    while sIn.getSwitchBoxSignal(0) == 1:
+                        sleep(1)
+                else:
+                    sleep(1)
+                if sIn.getSwitchBoxSignal(1) == 1 and sIn.getSwitchBoxSignal(2) == 1 and sIn.getSwitchBoxSignal(3) == 0:
+                    print("Square (1110)")
+                    sleep(2)
+                    square()
+                    while sIn.getSwitchBoxSignal(0) == 1:
+                        sleep(1)
+                else:
+                    sleep(1)
+                if sIn.getSwitchBoxSignal(1) == 0 and sIn.getSwitchBoxSignal(2) == 1 and sIn.getSwitchBoxSignal(3) == 0:
+                    print("Single Source Ultrasonic (1010")
+                    while(distance() > 152.4):
+                        leftTurn()
+                    stop()
+                    sleep(2)
+                    distanceAway = distance()
+                    while(distance() >= 10.16 and GPIO.input(mic.getPinSignal(0)) != 1 and GPIO.input(mic.getPinSignal(1)) == 0): #10 comparator output (2k signal)
+                        Forward()
+                    stop()
+                    sleep(2)
+                    if GPIO.input(mic.getPinSignal(0)) == 1 and GPIO.input(mic.getPinSignal(1)) == 0:
+                        stop()
+                    else:
+                        while distance() <= distanceAway:
+                            reverse()
+                        sleep(2)
+                sleep(10)
+                stop()
+                if sIn.getSwitchBoxSignal(1) == 0 and sIn.getSwitchBoxSignal(2) == 1 and sIn.getSwitchBoxSignal(3) == 1:  # 1011
+                    print("Multiple Source Ultrasonic (1011")
+                    while(not eightThousand):
+                        while (distance() > 152.4):
+                            leftTurn()
+                        stop()
+                        sleep(1)
+                        if GPIO.input(mic.getPinSignal(0)) == 0 and GPIO.input(mic.getPinSignal(1)) == 1 and not fiveHundred:  # If detects 500Hz Signal and hasnt already gone to it
+                            while (distance() >= 10.16 and GPIO.input(mic.getPinSignal(0)) == 0 and GPIO.input(mic.getPinSignal(1)) == 1):  # While robot hasnt reached or lost the (500hz signal)
+                                Forward()
+                            stop()
+                            sleep(2)
+                            if GPIO.input(mic.getPinSignal(0)) == 0 and GPIO.input(mic.getPinSignal(1)) == 1:
+                                fiveHundred = True
+                            while distance() <= distanceAway:
+                                reverse()
+                            sleep(2)
+
+                        if GPIO.input(mic.getPinSignal(0)) == 1 and GPIO.input(mic.getPinSignal(1)) == 0 and fiveHundred and not twoThousand:  # If detects 2k Signal and hasnt already gone to it, and has gotten the 500
+                            while (distance() >= 10.16 and GPIO.input(mic.getPinSignal(0)) == 1 and GPIO.input(mic.getPinSignal(1)) == 0):  # While robot hasnt reached or lost the (2khz signal)
+                                Forward()
+                            stop()
+                            sleep(2)
+                            if GPIO.input(mic.getPinSignal(0)) == 1 and GPIO.input(mic.getPinSignal(1)) == 0:
+                                twoThousand = True
+                            while distance() <= distanceAway:
+                                reverse()
+                            sleep(2)
+
+                        if GPIO.input(mic.getPinSignal(0)) == 1 and GPIO.input(mic.getPinSignal(1)) == 1 and fiveHundred and twoThousand and not eightThousand:  # If detects 8kk Signal and has already done 500 and 2k
+                            while (distance() >= 10.16 and GPIO.input(mic.getPinSignal(0)) == 1 and GPIO.input(mic.getPinSignal(1)) == 1):  # While robot hasnt reached or lost the (8khz signal)
+                                Forward()
+                            stop()
+                            sleep(2)
+                            if GPIO.input(mic.getPinSignal(0)) == 1 and GPIO.input(mic.getPinSignal(1)) == 1:
+                                  eightThousand = True
+                            while distance() <= distanceAway:
+                                reverse()
+                            sleep(2)
+                    stop()
+                    sleep(10)
+        else:
+            sOut.turnOff(0)
+
+
+try:
+    if __name__ == '__main__':
+        main()
+
+except KeyboardInterrupt:
+    GPIO.cleanup()
